@@ -1,0 +1,16 @@
+# Build intermediate folders
+bin/
+obj/
+*.pdb
+
+# Personal runtime cache (generated per-device at runtime)
+proxy_cache.json
+Release/proxy_cache.json
+Share/**/proxy_cache.json
+
+# Exclude large 70MB self-contained raw folder from git tree (keep lightweight zip)
+Share/CZN_NoVPN_Standalone/
+Share/CZN_NoVPN_DocLap_MoiMay.zip
+
+Share/CZN_NoVPN_Standalone.zip
+Share/CZN_NoVPN_DotNet8.zip
