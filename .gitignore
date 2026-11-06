@@ -1,0 +1,13 @@
+﻿# Build & binary outputs (keep out of git tree to avoid GitHub automated binary flags)
+bin/
+obj/
+Release/
+Share/
+*.exe
+*.dll
+*.pdb
+*.zip
+*.webp
+
+# Personal runtime cache
+proxy_cache.json

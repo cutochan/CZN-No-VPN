@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>CznNoVpn</AssemblyName>
+    <RootNamespace>CznNoVpn</RootNamespace>
+    <ApplicationHighDpiMode>SystemAware</ApplicationHighDpiMode>
+    <ApplicationIcon>app.ico</ApplicationIcon>
+    <Optimize>true</Optimize>
+    <Authors>CutoChan</Authors>
+    <Company>CutoChan</Company>
+    <Product>CZN No-VPN Launcher</Product>
+    <Description>Ultra-lightweight STOVE Split-Tunnel Launcher for Chaos Zero Nightmare by CutoChan</Description>
+    <RepositoryUrl>https://github.com/cutochan/CZN-No-VPN</RepositoryUrl>
+    <Version>1.0.0</Version>
+  </PropertyGroup>
+
+</Project>
