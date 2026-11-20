@@ -7,7 +7,7 @@ namespace CznNoVpn;
 
 public sealed class SmartProxyServer : IDisposable
 {
-    private readonly int _listenPort;
+    private int _listenPort;
     private readonly SurfEasyClient _upstream;
     private readonly Action<string>? _logger;
     private TcpListener? _listener;
@@ -33,8 +33,42 @@ public sealed class SmartProxyServer : IDisposable
             return;
 
         _cts = new CancellationTokenSource();
-        _listener = new TcpListener(IPAddress.Loopback, _listenPort);
-        _listener.Start(128);
+
+        var candidates = new List<int> { _listenPort };
+        for (int p = 18081; p <= 18090; p++)
+        {
+            if (p != _listenPort)
+                candidates.Add(p);
+        }
+        candidates.Add(0);
+
+        Exception? lastEx = null;
+        foreach (int candidatePort in candidates)
+        {
+            var listener = new TcpListener(IPAddress.Loopback, candidatePort);
+            try
+            {
+                listener.Start(128);
+                _listener = listener;
+                _listenPort = ((IPEndPoint)listener.LocalEndpoint).Port;
+                break;
+            }
+            catch (SocketException ex)
+            {
+                lastEx = ex;
+                try { listener.Stop(); } catch { }
+                if (candidatePort == _listenPort)
+                {
+                    Log($"[WARN] Port {candidatePort} is in use, searching for an available local port...");
+                }
+            }
+        }
+
+        if (_listener == null)
+        {
+            throw new InvalidOperationException($"Failed to bind local split-proxy port: {lastEx?.Message}", lastEx);
+        }
+
         _ = Task.Run(() => AcceptLoopAsync(_cts.Token));
         Log($"Smart split-proxy listening on 127.0.0.1:{_listenPort}");
     }

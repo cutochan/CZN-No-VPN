@@ -3,7 +3,7 @@
 > **Developed by [CutoChan](https://github.com/cutochan)**  
 > **Repository**: [https://github.com/cutochan/CZN-No-VPN](https://github.com/cutochan/CZN-No-VPN)
 
-An ultra-lightweight (**~230 KB**, native C# `.NET 8`) split-tunnel launcher that unlocks **Chaos Zero Nightmare (CZN)** on **STOVE PC Launcher** without routing your entire PC through a VPN.
+An ultra-lightweight (**v1.0.1**, native C# `.NET 8`) split-tunnel launcher that unlocks **Chaos Zero Nightmare (CZN)** on **STOVE PC Launcher** without routing your entire PC through a VPN.
 
 ---
 
@@ -11,12 +11,12 @@ An ultra-lightweight (**~230 KB**, native C# `.NET 8`) split-tunnel launcher tha
 
 - 🎯 **Smart Domain-Selective Split-Tunneling**:
   - **Tunneled via HTTPS Proxy**: Routes *only* STOVE's region-check and store domains (`*.onstove.com`, `*.onstove.vn`, `*.gate8.com`) so STOVE Launcher always detects a Global region and keeps **Chaos Zero Nightmare** unlocked in your library.
-  - **100% Direct Native Connection (`DIRECT`)**: All game patch downloads (`*.cloudfront.net`), **Chaos Zero Nightmare** game servers, Discord, YouTube, Steam, and web browsers connect directly through your native ISP at full speed with zero ping penalty.
+  - **100% Direct Native Connection (`DIRECT`)**: All game patch downloads & live game servers (`*.playstove.com`, `*.game.onstove.com`, `dl.onstove.com`, `*.cloudfront.net`), Discord, YouTube, Steam, and web browsers connect directly through your native ISP at full speed with zero ping penalty.
 - ⚡ **Zero Virtual Adapter & Zero Rebound Restarts**:
   - Does not install any virtual network adapter (no TAP/TUN/WireGuard drivers), preventing STOVE's `NetworkChangeDetector` from triggering forced region-change restarts mid-game.
   - Automatically detects `STOVE.exe` across any drive (`C:`, `D:`, `E:`, etc.) via Windows Registry (`sgup://` protocol handler).
-  - Benchmarks upstream nodes in parallel and caches credentials (`proxy_cache.json`) for **~1-second startup**.
-  - Automatically restores default Windows proxy settings upon exit.
+  - Benchmarks upstream nodes in parallel and stores session cache in `%LocalAppData%\CznNoVpn\proxy_cache.json` for **~1-second startup**.
+  - Resilient WinINet + Registry proxy setup with automatic Administrator elevation prompt fallback if restricted by Windows policies or Antivirus, and automatically restores default Windows proxy settings upon exit.
 
 ---
 
@@ -29,7 +29,7 @@ An ultra-lightweight (**~230 KB**, native C# `.NET 8`) split-tunnel launcher tha
 4. Wait 1–2 seconds until the status shows **"● Ready — Split-Tunnel Mode Active"**, then click **🚀 PLAY CHAOS ZERO NIGHTMARE**.
 5. While playing, you can click `X` to minimize the app to the **System Tray**. When you finish playing, right-click the System Tray icon and select **Exit Completely (Disable Proxy)**.
 
-> **Note**: The Lightweight edition (~101 KB) requires the [.NET 8.0 Desktop Runtime](https://dotnet.microsoft.com/en-us/download/dotnet/8.0). If you prefer a zero-dependency executable, you can build or use the Standalone edition below.
+> **Note**: The Lightweight edition (`~340 KB` zip) requires the [.NET 8.0 Desktop Runtime](https://dotnet.microsoft.com/en-us/download/dotnet/8.0). If you prefer a zero-dependency executable, you can build or use the Standalone edition below.
 
 ---
 

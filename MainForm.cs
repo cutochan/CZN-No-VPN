@@ -9,6 +9,7 @@ namespace CznNoVpn;
 public sealed class MainForm : Form
 {
     public const int ProxyPort = 18080;
+    public const string AppVersion = "1.0.1";
     public const string DeveloperName = "CutoChan";
     public const string GitHubRepoUrl = "https://github.com/cutochan/CZN-No-VPN";
 
@@ -26,16 +27,20 @@ public sealed class MainForm : Form
     private readonly Button _refreshNodeBtn;
     private readonly CheckBox _proxyToggleCheck;
     private readonly CheckBox _minimizeToTrayCheck;
+    private readonly Label _creditLabel;
+    private readonly LinkLabel _githubLink;
     private readonly NotifyIcon _trayIcon;
     private readonly System.Windows.Forms.Timer _uiTimer;
 
     private bool _isExiting;
+    private bool _suppressProxyToggleEvent;
+    private bool _systemProxyBlocked;
 
     public MainForm(bool autoLaunchOnStartup = false)
     {
         _autoLaunchOnStartup = autoLaunchOnStartup;
 
-        string cachePath = Path.Combine(AppContext.BaseDirectory, "proxy_cache.json");
+        string cachePath = Program.GetCacheFilePath();
         _surfEasy = new SurfEasyClient(cachePath, AppendLog);
         _proxyServer = new SmartProxyServer(ProxyPort, _surfEasy, AppendLog);
 
@@ -75,6 +80,7 @@ public sealed class MainForm : Form
             Font = new Font("Segoe UI", 8.8f, FontStyle.Regular),
             ForeColor = Color.FromArgb(165, 175, 195),
             AutoSize = true,
+            UseMnemonic = false,
             Location = new Point(18, 42)
         };
 
@@ -182,19 +188,7 @@ public sealed class MainForm : Form
             Location = new Point(18, 264),
             ForeColor = Color.FromArgb(210, 218, 232)
         };
-        _proxyToggleCheck.CheckedChanged += (_, _) =>
-        {
-            if (_proxyToggleCheck.Checked)
-            {
-                SystemProxyManager.EnableSmartSystemProxy(ProxyPort);
-                AppendLog("Smart Proxy enabled for STOVE.");
-            }
-            else
-            {
-                SystemProxyManager.DisableSystemProxy();
-                AppendLog("System Proxy disabled (restored default settings).");
-            }
-        };
+        _proxyToggleCheck.CheckedChanged += OnProxyToggleCheckedChanged;
 
         _minimizeToTrayCheck = new CheckBox
         {
@@ -220,7 +214,7 @@ public sealed class MainForm : Form
         };
 
         // Footer Credit Bar (Dev: CutoChan + GitHub Link)
-        var creditLabel = new Label
+        _creditLabel = new Label
         {
             Text = $"Developed by {DeveloperName}  •  GitHub:",
             Font = new Font("Segoe UI Semibold", 9f, FontStyle.Regular),
@@ -229,7 +223,7 @@ public sealed class MainForm : Form
             Location = new Point(18, 437)
         };
 
-        var githubLink = new LinkLabel
+        _githubLink = new LinkLabel
         {
             Text = "github.com/cutochan/CZN-No-VPN",
             Font = new Font("Segoe UI Semibold", 9f, FontStyle.Regular),
@@ -237,9 +231,9 @@ public sealed class MainForm : Form
             ActiveLinkColor = Color.FromArgb(160, 210, 255),
             VisitedLinkColor = Color.FromArgb(110, 175, 255),
             AutoSize = true,
-            Location = new Point(222, 437)
+            Location = new Point(_creditLabel.Left + _creditLabel.PreferredWidth + 4, 437)
         };
-        githubLink.LinkClicked += (_, _) => OpenGitHubRepo();
+        _githubLink.LinkClicked += (_, _) => OpenGitHubRepo();
 
         var githubBtn = new Button
         {
@@ -264,9 +258,15 @@ public sealed class MainForm : Form
         Controls.Add(_proxyToggleCheck);
         Controls.Add(_minimizeToTrayCheck);
         Controls.Add(_logBox);
-        Controls.Add(creditLabel);
-        Controls.Add(githubLink);
+        Controls.Add(_creditLabel);
+        Controls.Add(_githubLink);
         Controls.Add(githubBtn);
+
+        // Adjust dynamic layout after DPI scaling completes on Load
+        Load += (_, _) =>
+        {
+            _githubLink.Location = new Point(_creditLabel.Right + 4, _creditLabel.Top);
+        };
 
         // System Tray Menu
         var trayMenu = new ContextMenuStrip();
@@ -294,6 +294,52 @@ public sealed class MainForm : Form
         FormClosing += OnFormClosing;
     }
 
+    private void OnProxyToggleCheckedChanged(object? sender, EventArgs e)
+    {
+        if (_suppressProxyToggleEvent)
+            return;
+
+        int activePort = _proxyServer.Port;
+        if (_proxyToggleCheck.Checked)
+        {
+            if (SystemProxyManager.EnableSmartSystemProxy(activePort, out string? err))
+            {
+                _systemProxyBlocked = false;
+                AppendLog($"Smart Proxy enabled for STOVE (127.0.0.1:{activePort}).");
+            }
+            else
+            {
+                _systemProxyBlocked = true;
+                SetProxyToggleChecked(false);
+                AppendLog($"[WARN] Could not enable Windows System Proxy ({err}).");
+                MessageBox.Show(
+                    this,
+                    $"Could not update Windows System Proxy settings ({err}).\n\nPlease try running as Administrator or allow CznNoVpn.exe in your Antivirus.\nYou can still launch STOVE directly using the Play button (process-level proxy mode).",
+                    "System Proxy Permission Notice",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+            }
+        }
+        else
+        {
+            SystemProxyManager.DisableSystemProxy();
+            AppendLog("System Proxy disabled (restored default settings).");
+        }
+    }
+
+    private void SetProxyToggleChecked(bool isChecked)
+    {
+        _suppressProxyToggleEvent = true;
+        try
+        {
+            _proxyToggleCheck.Checked = isChecked;
+        }
+        finally
+        {
+            _suppressProxyToggleEvent = false;
+        }
+    }
+
     private static void OpenGitHubRepo()
     {
         try
@@ -312,15 +358,79 @@ public sealed class MainForm : Form
 
     private async Task OnFormShownAsync()
     {
-        AppendLog($"CZN No-VPN Launcher v1.0.0 — Developed by {DeveloperName} ({GitHubRepoUrl})");
-        _proxyServer.Start();
-        SystemProxyManager.EnableSmartSystemProxy(ProxyPort);
-
-        await RefreshTunnelAsync(forceNew: false);
-
-        if (_autoLaunchOnStartup && _launchCznBtn.Enabled)
+        try
         {
-            await LaunchGameFlowAsync(autoStartCzn: true);
+            AppendLog($"CZN No-VPN Launcher v{AppVersion} — Developed by {DeveloperName} ({GitHubRepoUrl})");
+
+            try
+            {
+                _proxyServer.Start();
+            }
+            catch (Exception ex)
+            {
+                AppendLog($"[ERROR] Local proxy server failed to start: {ex.Message}");
+                _statusBadgeLabel.Text = "● Local proxy failed to start";
+                _statusBadgeLabel.ForeColor = Color.FromArgb(255, 105, 105);
+                return;
+            }
+
+            int activePort = _proxyServer.Port;
+            _proxyToggleCheck.Text = $"Enable Smart Proxy for STOVE (127.0.0.1:{activePort})";
+
+            if (!SystemProxyManager.EnableSmartSystemProxy(activePort, out string? proxyErr))
+            {
+                _systemProxyBlocked = true;
+                SetProxyToggleChecked(false);
+                AppendLog($"[WARN] Could not enable Windows System Proxy ({proxyErr}).");
+
+                if (!SystemProxyManager.IsRunningAsAdministrator())
+                {
+                    var result = MessageBox.Show(
+                        this,
+                        $"Windows blocked updating System Proxy settings:\n\"{proxyErr}\"\n\n" +
+                        "Would you like to restart CZN No-VPN Launcher as Administrator?\n" +
+                        "• Click Yes to restart with Administrator privileges.\n" +
+                        "• Click No to continue in Process-Proxy Mode (still launches STOVE).",
+                        "Administrator Permission Recommended",
+                        MessageBoxButtons.YesNo,
+                        MessageBoxIcon.Warning);
+
+                    if (result == DialogResult.Yes)
+                    {
+                        string[]? relaunchArgs = _autoLaunchOnStartup ? new[] { "--play" } : null;
+                        if (SystemProxyManager.RestartAsAdministrator(relaunchArgs))
+                        {
+                            Program.ReleaseSingleInstanceMutex();
+                            ExitCleanly();
+                            return;
+                        }
+
+                        AppendLog("[WARN] Administrator elevation was cancelled; continuing in Process-Proxy Mode.");
+                    }
+                }
+                else
+                {
+                    AppendLog("[TIP] Running as Admin but Windows Proxy is locked. Please whitelist CznNoVpn.exe in your Antivirus or check Windows Proxy Group Policy.");
+                }
+            }
+            else
+            {
+                _systemProxyBlocked = false;
+            }
+
+            await RefreshTunnelAsync(forceNew: false);
+
+            if (_autoLaunchOnStartup && _launchCznBtn.Enabled)
+            {
+                await LaunchGameFlowAsync(autoStartCzn: true);
+            }
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"[ERROR] Startup error: {ex.Message}");
+            _statusBadgeLabel.Text = "● Startup error (see log below)";
+            _statusBadgeLabel.ForeColor = Color.FromArgb(255, 105, 105);
+            _refreshNodeBtn.Enabled = true;
         }
     }
 
@@ -363,10 +473,11 @@ public sealed class MainForm : Form
     {
         try
         {
-            _stoveRegionLabel.Text = "STOVE Region: Verifying via 127.0.0.1:18080...";
+            int activePort = _proxyServer.Port;
+            _stoveRegionLabel.Text = $"STOVE Region: Verifying via 127.0.0.1:{activePort}...";
             using var handler = new SocketsHttpHandler
             {
-                Proxy = new WebProxy($"http://127.0.0.1:{ProxyPort}"),
+                Proxy = new WebProxy($"http://127.0.0.1:{activePort}"),
                 UseProxy = true,
                 ConnectTimeout = TimeSpan.FromSeconds(10)
             };
@@ -400,13 +511,13 @@ public sealed class MainForm : Form
     {
         try
         {
-            if (!_proxyToggleCheck.Checked)
+            int activePort = _proxyServer.Port;
+            if (!_systemProxyBlocked && !_proxyToggleCheck.Checked)
             {
-                _proxyToggleCheck.Checked = true;
-            }
-            else
-            {
-                SystemProxyManager.EnableSmartSystemProxy(ProxyPort);
+                if (SystemProxyManager.EnableSmartSystemProxy(activePort, out _))
+                {
+                    SetProxyToggleChecked(true);
+                }
             }
 
             if (SystemProxyManager.IsStoveRunning() && !SystemProxyManager.IsCznRunning())
@@ -416,7 +527,7 @@ public sealed class MainForm : Form
                 await Task.Delay(800);
             }
 
-            SystemProxyManager.LaunchStoveAndCzn(ProxyPort, autoLaunchGame: autoStartCzn, AppendLog);
+            SystemProxyManager.LaunchStoveAndCzn(activePort, autoLaunchGame: autoStartCzn, AppendLog);
             AppendLog("Launch command sent! Keep this app running in the System Tray while STOVE is open.");
         }
         catch (Exception ex)
